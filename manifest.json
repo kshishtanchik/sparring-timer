@@ -3,7 +3,7 @@
     "name": "Таймер для спаррингов",
     "icons": [
       {
-        "src": "https://flaticon.com",
+        "src": "stopwatch.png",
         "type": "image/png",
         "sizes": "512x512"
       }
