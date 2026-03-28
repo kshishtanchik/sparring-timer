@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Таймер Спаррингов</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root { --bg: #1a1a1a; --text: #fff; --accent: #ffcc00; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; transition: background 0.5s; overflow: hidden; }
+        #app { text-align: center; width: 90%; max-width: 400px; }
+        .hidden { display: none; }
+        input { width: 100%; padding: 15px; margin: 10px 0 20px; background: #333; border: 1px solid #555; color: #fff; font-size: 1.2rem; border-radius: 10px; box-sizing: border-box; }
+        button { width: 100%; padding: 20px; font-size: 1.5rem; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; margin-bottom: 10px; }
+        .start-btn { background: var(--accent); color: #000; }
+        .action-btn { background: #444; color: #fff; }
+        #timer-display { font-size: 7rem; font-weight: 900; margin: 10px 0; font-variant-numeric: tabular-nums; }
+        #status-text { font-size: 2.5rem; font-weight: bold; text-transform: uppercase; }
+        #round-info { font-size: 1.2rem; opacity: 0.8; }
+        .work-mode { background-color: #0d2e1a; }
+        .rest-mode { background-color: #3b110c; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <!-- ЭКРАН НАСТРОЕК -->
+    <div id="setup">
+        <h1>Настройки</h1>
+        <label>Раундов</label>
+        <input type="number" id="rounds-input" value="3">
+        <label>Работа (сек)</label>
+        <input type="number" id="work-input" value="180">
+        <label>Отдых (сек)</label>
+        <input type="number" id="rest-input" value="60">
+        <button class="start-btn" onclick="startTimer()">СТАРТ</button>
+    </div>
+
+    <!-- ЭКРАН ТАЙМЕРА -->
+    <div id="timer" class="hidden">
+        <div id="round-info">Раунд 1 / 3</div>
+        <div id="status-text">БОЙ</div>
+        <div id="timer-display">03:00</div>
+        <button class="action-btn" id="pause-btn" onclick="togglePause()">ПАУЗА</button>
+        <button class="action-btn" onclick="stopTimer()">СТОП</button>
+    </div>
+</div>
+
+<script>
+    let rounds, workTime, restTime, currentRound, timeLeft, timerInterval;
+    let isWorkMode = true, isPaused = false, wakeLock = null;
+
+    // Регистрация Service Worker для PWA
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+
+    // Загрузка настроек
+    window.onload = () => {
+        const saved = JSON.parse(localStorage.getItem('timerSettings'));
+        if (saved) {
+            document.getElementById('rounds-input').value = saved.rounds;
+            document.getElementById('work-input').value = saved.work;
+            document.getElementById('rest-input').value = saved.rest;
+        }
+    };
+
+    // Блокировка засыпания экрана
+    async function toggleWakeLock(on) {
+        if (!('wakeLock' in navigator)) return;
+        try {
+            if (on) wakeLock = await navigator.wakeLock.request('screen');
+            else if (wakeLock) { await wakeLock.release(); wakeLock = null; }
+        } catch (err) { console.error(err); }
+    }
+
+    function startTimer() {
+        rounds = parseInt(document.getElementById('rounds-input').value);
+        workTime = parseInt(document.getElementById('work-input').value);
+        restTime = parseInt(document.getElementById('rest-input').value);
+        
+        localStorage.setItem('timerSettings', JSON.stringify({rounds, work: workTime, rest: restTime}));
+
+        currentRound = 1; isWorkMode = true; isPaused = false; timeLeft = workTime;
+        document.getElementById('setup').classList.add('hidden');
+        document.getElementById('timer').classList.remove('hidden');
+        
+        toggleWakeLock(true);
+        updateUI();
+        beep(880);
+
+        timerInterval = setInterval(() => {
+            if (!isPaused) {
+                timeLeft--;
+                if (timeLeft < 0) switchPhase();
+                updateUI();
+            }
+        }, 1000);
+    }
+
+    function switchPhase() {
+        if (isWorkMode) {
+            if (currentRound >= rounds) return stopTimer(true);
+            isWorkMode = false; timeLeft = restTime; beep(440);
+        } else {
+            currentRound++; isWorkMode = true; timeLeft = workTime; beep(880);
+        }
+    }
+
+    function stopTimer(finished = false) {
+        clearInterval(timerInterval);
+        toggleWakeLock(false);
+        if (finished) alert("Тренировка завершена!");
+        document.getElementById('setup').classList.remove('hidden');
+        document.getElementById('timer').classList.add('hidden');
+        document.body.className = '';
+    }
+
+    function updateUI() {
+        const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+        const s = (timeLeft % 60).toString().padStart(2, '0');
+        document.getElementById('timer-display').innerText = `${m}:${s}`;
+        document.getElementById('round-info').innerText = `Раунд ${currentRound} / ${rounds}`;
+        document.getElementById('status-text').innerText = isWorkMode ? "БОЙ" : "ОТДЫХ";
+        document.body.className = isWorkMode ? 'work-mode' : 'rest-mode';
+    }
+
+    function togglePause() {
+        isPaused = !isPaused;
+        document.getElementById('pause-btn').innerText = isPaused ? "ПРОДОЛЖИТЬ" : "ПАУЗА";
+    }
+
+    function beep(freq) {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.frequency.value = freq; osc.start();
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1);
+        osc.stop(ctx.currentTime + 1);
+    }
+
+    // Переподключение WakeLock при возврате в приложение
+    document.addEventListener('visibilitychange', () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') toggleWakeLock(true);
+    });
+</script>
+</body>
+</html>

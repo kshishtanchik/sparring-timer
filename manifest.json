@@ -1,0 +1,16 @@
+{
+    "short_name": "SparTimer",
+    "name": "Таймер для спаррингов",
+    "icons": [
+      {
+        "src": "https://flaticon.com",
+        "type": "image/png",
+        "sizes": "512x512"
+      }
+    ],
+    "start_url": "./index.html",
+    "background_color": "#1a1a1a",
+    "display": "standalone",
+    "theme_color": "#ffcc00"
+  }
+  
