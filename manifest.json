@@ -2,14 +2,14 @@
   "name": "Таймер для спаррингов",
   "short_name": "Спарринг",
   "description": "Простой таймер для бокса и ММА",
-  "start_url": ".",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#1a1a1a",
   "theme_color": "#ffcc00",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "stopwatch.png",
+      "src": "./stopwatch.png",
       "type": "image/png",
       "sizes": "512x512"
     }
